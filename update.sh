@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# Pull latest changes from the remote repository
-git pull
+# Fetch latest changes from upstream and rebase personal customizations on top
+git fetch origin
+git rebase origin/master
 
 # Activate the Python virtual environment
 source venv/bin/activate
@@ -53,3 +54,6 @@ pip cache purge
 
 # Deactivate the virtual environment
 deactivate
+
+# Push rebased branch (upstream changes + personal customizations) to personal remote
+git push custom master --force-with-lease
