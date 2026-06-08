@@ -18,6 +18,12 @@ export TORCH_BLAS_PREFER_HIPBLASLT=0
 # MIOpen FAST mode (2): heuristic-only kernel selection — avoids minutes of exhaustive search at startup
 export MIOPEN_FIND_MODE=2
 
+# Persist MIOpen kernel compilation cache across sessions.
+# Without this, switching to a CLIP model with a different architecture (e.g. T5 → OpenCLIP)
+# triggers a full kernel recompile every time the process restarts — 2–5 min of apparent hang.
+export MIOPEN_USER_DB_PATH="$HOME/.cache/miopen"
+export MIOPEN_CACHE_DIR="$HOME/.cache/miopen"
+
 # expandable_segments disabled (hipErrorIllegalAddress with GFX overrides).
 # garbage_collection_threshold:0.3 — trigger GC early; gives headroom for ControlNet/MODEL_PATCH
 # spikes on top of fp8 UNET + Qwen-3-4B encoder stack.
@@ -34,7 +40,8 @@ export MALLOC_MMAP_THRESHOLD_=134217728
 export MALLOC_TRIM_THRESHOLD_=134217728
 
 # WAN video generation: use VAEDecodeTiled (not VAEDecode) to avoid VRAM OOM on long sequences.
-#   Only tested/working: WAN 2.2 5B model, 960×544 resolution, tile_size=256, overlap=64, temporal_size=16, temporal_overlap=4.
+#   Safe baseline (16 GB RX 6800 XT): WAN 2.2 5B FP16, 768×480, tile_size=256, overlap=64, temporal_size=16, temporal_overlap=4.
+#   Current workflow uses temporal_size=64 (fewer passes, higher peak VRAM) — reduce to 16 if OOM.
 
 # proto-plus/protobuf C extension segfaults when google-generativeai is loaded by comfyui_starnodes;
 # pure Python implementation avoids the crash at the cost of slightly slower protobuf serialization.
@@ -47,6 +54,8 @@ export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 # everything to RAM simultaneously.
 # --use-split-cross-attention removed: it targets UNet cross-attention only and has no effect
 # on Z-Image Turbo's DiT/transformer (Lumina2) architecture — it added overhead for nothing.
-python main.py --enable-manager --reserve-vram 2 "$@"
+# --cache-lru 2: keep the 2 most recently used models (including CLIP) pinned in system RAM.
+# Workflow switches between the same pair of CLIP models skip disk re-reads entirely.
+python main.py --enable-manager --reserve-vram 2 --cache-lru 2 "$@"
 
 deactivate
